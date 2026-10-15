@@ -58,12 +58,16 @@ Ditunggu log `tick due=.. sent=.. failed=..` tiap menit. Hentikan dengan Ctrl+C.
    sesi aktif -> pesan yang sesuai.
 3. `/hari_ini` -> progres + streak.
 4. `/jadwal` -> rencana hari ini + Dzuhur/Ashar WIB + label lokasi.
-5. `/lokasi` -> lokasi aktif + daftar preset; `/lokasi karanganyar` ->
-   konfirmasi; `/lokasi salah` -> ditolak.
+5. `/lokasi` (belum memilih apa pun) -> "Yogyakarta (default)" + daftar
+   preset; `/lokasi karanganyar` -> konfirmasi; `/lokasi salah` -> ditolak.
 6. Kirim lokasi (attachment location) -> "Lokasi diperbarui, akurasi
    sekitar 1 km."; kirim ulang `/jadwal` -> label "lokasi kiriman".
 7. Dari chat non-allowlist: semua perintah diabaikan diam-diam.
-8. Dry-run tanpa Telegram/DB-write:
+8. Perintah tak dikenal dari allowlist (mis. `/ngawur`) -> dibalas daftar
+   perintah singkat. Menu perintah didaftarkan otomatis saat bot start;
+   untuk token prod daftarkan sekali via
+   `npx tsx scripts/telegram-webhook.ts commands`.
+9. Dry-run tanpa Telegram/DB-write:
    `npm run reminder:simulate -- --at "2026-10-12T08:05:00+07:00"`.
 
 ## Memulihkan dari backup (aman, tanpa menghapus volume yang ada)

@@ -13,10 +13,58 @@ import {
   trackSchema,
 } from "../lib/validation";
 import { todayProgress } from "../services/reminderService";
-import { isAllowedChat } from "./security";
+import { createAllowlistGuard } from "./security";
 import { jadwalMessage, lokasiListMessage, progressLine } from "./texts";
 
 const MAX_SESSION_MINUTES = 240;
+
+const KNOWN_COMMANDS = ["mulai", "selesai", "hari_ini", "jadwal", "lokasi"] as const;
+
+export const HELP_TEXT =
+  "Perintah: /mulai <dicoding|clinform> [menit], /selesai [catatan], /hari_ini, /jadwal, /lokasi [kunci]";
+
+/** Menu perintah untuk setMyCommands (muncul di klien Telegram). */
+export const BOT_COMMANDS: Array<{ command: string; description: string }> = [
+  { command: "mulai", description: "Mulai sesi belajar" },
+  { command: "selesai", description: "Tutup sesi + catatan" },
+  { command: "hari_ini", description: "Progres hari ini" },
+  { command: "jadwal", description: "Jadwal + jam sholat hari ini" },
+  { command: "lokasi", description: "Lihat/atur lokasi" },
+];
+
+/**
+ * Teks bantuan bila pesan adalah perintah TAK dikenal; null bila bukan
+ * perintah atau sudah dikenal (sudah ditangani handler lain).
+ */
+export function unknownCommandReply(text: string): string | null {
+  const first = text.trim().split(/\s+/)[0] ?? "";
+  if (!first.startsWith("/")) return null;
+  const name = first.slice(1).split("@")[0]?.toLowerCase() ?? "";
+  if ((KNOWN_COMMANDS as readonly string[]).includes(name)) return null;
+  return HELP_TEXT;
+}
+
+export interface LocationSetting {
+  locationKey: string | null;
+  locationLat: number | null;
+  locationLon: number | null;
+}
+
+/**
+ * Label lokasi aktif. "lokasi kiriman" HANYA bila koordinat benar-benar ada;
+ * bila belum memilih apa pun, tampilkan preset default + "(default)".
+ */
+export function activeLocationLabel(setting: LocationSetting | null, defaultKey: string): string {
+  const key = setting?.locationKey;
+  if (typeof key === "string" && key !== "") {
+    return getPreset(key)?.name ?? "lokasi kiriman";
+  }
+  if (typeof setting?.locationLat === "number" && typeof setting?.locationLon === "number") {
+    return "lokasi kiriman";
+  }
+  const preset = getPreset(defaultKey);
+  return preset === null ? `${defaultKey} (default)` : `${preset.name} (default)`;
+}
 
 async function singleUserId(): Promise<string | null> {
   const user = await db.user.findFirst({ select: { id: true } });
@@ -41,13 +89,7 @@ const MULAI_USAGE = "Pakai: /mulai <dicoding|clinform> [menit 1-180]";
 
 export function registerCommands(bot: Bot): void {
   // Allowlist: chat lain diabaikan diam-diam (tanpa next, tanpa balasan).
-  bot.use(async (ctx, next) => {
-    const chatId = ctx.from?.id;
-    if (typeof chatId !== "number" || !isAllowedChat(chatId, env.TELEGRAM_ALLOWED_CHAT_IDS)) {
-      return;
-    }
-    await next();
-  });
+  bot.use(createAllowlistGuard(env.TELEGRAM_ALLOWED_CHAT_IDS));
 
   bot.command("mulai", async (ctx) => {
     const userId = await singleUserId();
@@ -206,14 +248,10 @@ export function registerCommands(bot: Bot): void {
     }
     const arg = (ctx.msg?.text ?? "").split(/\s+/)[1];
     const setting = await db.userSetting.findUnique({ where: { userId } });
-    const currentLabel =
-      setting?.locationKey !== null && setting?.locationKey !== undefined
-        ? (getPreset(setting.locationKey)?.name ?? "lokasi kiriman")
-        : "lokasi kiriman";
     if (arg === undefined || arg === "") {
       await ctx.reply(
         lokasiListMessage(
-          setting === null ? env.LOCATION_DEFAULT_KEY : currentLabel,
+          activeLocationLabel(setting, env.LOCATION_DEFAULT_KEY),
           Object.values(LOCATION_PRESETS).map((p) => ({ key: p.key, name: p.name })),
         ),
       );
@@ -230,6 +268,16 @@ export function registerCommands(bot: Bot): void {
       update: { locationKey: preset.key, locationLat: null, locationLon: null },
     });
     await ctx.reply(`Lokasi: ${preset.name}.`);
+  });
+
+  // Perintah tak dikenal dari allowlist -> daftar singkat. Non-allowlist
+  // sudah disaring guard di atas sehingga tetap diam. Handler ini jalan juga
+  // untuk perintah dikenal, tapi mengembalikan null (diam) untuk mereka.
+  bot.on("message:text", async (ctx) => {
+    const reply = unknownCommandReply(ctx.msg?.text ?? "");
+    if (reply !== null) {
+      await ctx.reply(reply);
+    }
   });
 
   // Terima pesan lokasi (latitude/longitude) hanya dari allowlist.

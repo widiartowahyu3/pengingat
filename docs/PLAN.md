@@ -29,3 +29,6 @@ Kalibrasi Kemenag menunggu data manual user (tabel 5 tanggal di laporan Tahap A)
 - 2026-10-11 Pra-tahap: tabel kalibrasi 5 tanggal (adjustments tetap nol);
   skrip `reminder:simulate`; urutan tahap diubah (uji live lokal -> C -> B
   -> D -> Fase 5); panduan `docs/UJI-LOKAL.md`.
+- 2026-10-13 Perbaikan bot: label default "Yogyakarta (default)"; perintah
+  tak dikenal dibalas daftar (non-allowlist diam) + setMyCommands;
+  tick diam bila due=0/failed=0; vitest config .mts; 65 tes lolos.

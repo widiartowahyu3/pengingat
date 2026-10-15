@@ -1,16 +1,18 @@
 // Utilitas webhook Telegram yang aman: token dibaca dari env dan
 // TIDAK PERNAH dicetak ke output (termasuk saat error).
-// Pakai: npx tsx scripts/telegram-webhook.ts [set|delete|info]
+// Pakai: npx tsx scripts/telegram-webhook.ts [set|delete|info|commands]
 //
 // - set: daftarkan APP_BASE_URL/api/telegram/webhook (+secret header).
 // - delete: hapus webhook (wajib sebelum polling lokal memakai token yang sama).
 // - info: tampilkan status webhook tanpa token.
+// - commands: daftarkan menu perintah (setMyCommands) tanpa token di output.
 //
 // Aturan dua bot: token dev dan prod BERBEDA (dua bot di BotFather).
 // Polling dan webhook tidak boleh aktif bersamaan untuk satu token:
 // jalankan `delete` dulu sebelum `npm run bot`, dan hentikan bot lokal
 // sebelum `set` untuk produksi.
 import "dotenv/config";
+import { BOT_COMMANDS } from "../bot/commands";
 
 function fail(message: string): never {
   console.error(message);
@@ -73,8 +75,11 @@ async function main(): Promise<void> {
     console.log(
       `webhook url=${res.result?.url ?? "-"} pending=${res.result?.pending_update_count ?? "-"}`,
     );
+  } else if (cmd === "commands") {
+    const res = await callApi(token, "setMyCommands", { commands: BOT_COMMANDS });
+    console.log(`setMyCommands ok=${res.ok} count=${BOT_COMMANDS.length}`);
   } else {
-    fail("pakai: npx tsx scripts/telegram-webhook.ts [set|delete|info]");
+    fail("pakai: npx tsx scripts/telegram-webhook.ts [set|delete|info|commands]");
   }
 }
 
