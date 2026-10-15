@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { db } from "../lib/db";
+import { db } from "./helpers/db";
 import { addMinutes } from "../lib/time";
 import { runCleanup } from "../services/cleanupService";
 import { cleanTestDb, createTestUser } from "./helpers/db";

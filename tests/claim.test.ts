@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { db } from "../lib/db";
+import { db } from "./helpers/db";
 import { markEventFailed, markEventSent, tryClaimEvent } from "../repositories/reminderRepo";
 import { cleanTestDb, createTestUser } from "./helpers/db";
 

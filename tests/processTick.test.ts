@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { db } from "../lib/db";
+import { db } from "./helpers/db";
 import { processTick, type TickSender } from "../services/reminderService";
 import { cleanTestDb, createTestUser } from "./helpers/db";
 

@@ -39,6 +39,14 @@ Kalibrasi Kemenag menunggu data manual user (tabel 5 tanggal di laporan Tahap A)
   remote-DB (config+seed); gerbang jam + maxDuration 60 + validasi setting;
   tes route 401/404; postinstall generate + engines 22.x + bukti build
   bersih. Tes murni 66/66; suite penuh + cabang skipped menunggu Docker.
+- 2026-10-14 Guard berbasis perintah: no-db selalu lolos (ALLOW_REMOTE_DB
+  dihapus dari env Vercel + peringatan vercel env pull/.env); reset/push
+  selalu ditolak remote; seed dijaga. Tes murni 76/76; bukti build bersih
+  tanpa flag lolos; suite penuh menunggu Docker.
+- 2026-10-14 Guard posisional + never-remote diperluas (dev/execute) +
+  IPv6/lookalike + URL tes bersama (host loopback, nama *_test, tanpa
+  bypass) + tes mutasi via helpers/db + assert env. Suite penuh 96/96
+  (14 file) lolos dengan Docker; lint/typecheck/format/build bersih.
 
 ## Rencana Tahap C — Deploy (Vercel Hobby + Neon + cron-job.org)
 
@@ -60,10 +68,14 @@ endpoint data lain. Dev tetap polling + bot dev; prod webhook + bot kedua.
    `DATABASE_URL` (pooled), `SESSION_SECRET`, `TELEGRAM_BOT_TOKEN` (bot
    PROD, beda dari dev), `TELEGRAM_WEBHOOK_SECRET`,
    `TELEGRAM_ALLOWED_CHAT_IDS`, `CRON_SECRET`, `BOT_MODE=webhook`,
-   `TRUST_PROXY=true`, `LOCATION_DEFAULT_KEY=yogyakarta`,
-   `ALLOW_REMOTE_DB=1` (agar `prisma generate` saat build diizinkan).
-   TANPA `DIRECT_URL` di Vercel. `APP_BASE_URL` diisi SETELAH deploy
-   pertama (domain alias) lalu redeploy. Redeploy tiap ubah env.
+   `TRUST_PROXY=true`, `LOCATION_DEFAULT_KEY=yogyakarta`.
+   TANPA `DIRECT_URL` dan TANPA `ALLOW_REMOTE_DB` di Vercel (generate/
+   validate/format selalu diizinkan tanpa flag). `APP_BASE_URL` diisi
+   SETELAH deploy pertama (domain alias) lalu redeploy. Redeploy tiap
+   ubah env. PERINGATAN: jangan `vercel env pull` ke folder proyek ini
+   tanpa meninjau isi (bisa membawa URL produksi ke `.env` lokal);
+   jangan memakai nama `.env` untuk file berisi URL produksi (gunakan
+   nama lain di luar repo + `read -s`, lalu hapus).
 3. Vercel Settings → Functions → region `sin1` (sumber:
    vercel.com/docs/regions + /functions/configuring-functions/region;
    default `iad1` harus diganti agar dekat Neon Singapura).

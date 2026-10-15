@@ -1,4 +1,15 @@
-import { db } from "../../lib/db";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
+import { assertTestDatabaseUrl, testDatabaseUrl } from "./test-db-url";
+
+// Koneksi database TES dari fungsi bersama — BUKAN DATABASE_URL lingkungan.
+// Berhenti saat import bila env menunjuk ke bukan-DB-tes (sebelum query apa pun).
+const url = testDatabaseUrl();
+assertTestDatabaseUrl(process.env.DATABASE_URL, url);
+
+const adapter = new PrismaPg({ connectionString: url });
+
+export const db: PrismaClient = new PrismaClient({ adapter });
 
 // Helper database TES terpisah. Urutan hapus mengikuti foreign key.
 export async function cleanTestDb(): Promise<void> {
