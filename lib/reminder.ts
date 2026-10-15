@@ -6,6 +6,7 @@ import {
   formatWibHm,
   parseHhMm,
   wibDateKey,
+  wibMinutes,
   wibWeekday,
 } from "./time";
 
@@ -15,10 +16,21 @@ import {
 export const REMINDER_WINDOW_MINUTES = 20;
 export const CLAIM_RETRY_AFTER_MINUTES = 2;
 
+// Gerbang hemat CU Neon: di luar jam ini tick keluar sebelum query DB apa pun.
+// Satu sumber kebenaran — dipakai gerbang cron DAN validasi setting.
+export const ACTIVE_START_MINUTES = 7 * 60 + 55; // 07:55 WIB
+export const ACTIVE_END_MINUTES = 16 * 60 + 30; // 16:30 WIB
+
 export type ReminderEventKey =
   "STUDY_START" | "DZUHUR_BREAK" | "DZUHUR_RESUME" | "ASHAR_BREAK" | "ASHAR_RESUME" | "DAY_END";
 
 export type ClaimStatus = "CLAIMED" | "SENT" | "FAILED";
+
+/** true bila instant berada di jam aktif [07:55, 16:30) WIB. */
+export function isWithinActiveHours(now: Date): boolean {
+  const m = wibMinutes(now);
+  return m >= ACTIVE_START_MINUTES && m < ACTIVE_END_MINUTES;
+}
 
 export interface TickSettings {
   studyStartWib: string;

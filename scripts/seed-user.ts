@@ -3,10 +3,14 @@
 import "dotenv/config";
 import readline from "node:readline";
 import * as argon2 from "argon2";
+import { guardRemoteDatabase } from "../lib/prisma-guard";
 import { env } from "../lib/env";
 import { db } from "../lib/db";
 
 void env; // fail-fast bila env kurang (lib/env throw saat import)
+
+// Pengaman: seed ke database non-lokal hanya dengan ALLOW_REMOTE_DB=1.
+guardRemoteDatabase(process.env.DATABASE_URL ?? "");
 
 const MIN_PASSWORD_LENGTH = 14;
 const DEFAULT_TARGET_MINUTES = 60; // asumsi Fase 0: 60 mnt per jalur

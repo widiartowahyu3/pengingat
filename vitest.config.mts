@@ -1,6 +1,10 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    // Samakan alias @/* tsconfig agar route Next bisa diimpor di tes.
+    alias: { "@": import.meta.dirname },
+  },
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],

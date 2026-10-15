@@ -1,11 +1,34 @@
 import { z } from "zod";
 import { LOCATION_PRESET_KEYS } from "./locations";
+import { ACTIVE_END_MINUTES, ACTIVE_START_MINUTES, REMINDER_WINDOW_MINUTES } from "./reminder";
 
 // Skema validasi input (server + bot). Batas aman sesuai aturan main.
 
 export const hhMmSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "format jam harus HH:MM (00:00-23:59)");
+
+function hhMmToMinutes(s: string): number {
+  const [h, m] = s.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+/**
+ * Jam mulai belajar: tidak boleh sebelum gerbang hemat CU (07:55 WIB),
+ * supaya tick tak pernah punya event di luar jam aktif.
+ */
+export const studyStartWibSchema = hhMmSchema.refine(
+  (s) => hhMmToMinutes(s) >= ACTIVE_START_MINUTES,
+  { message: "studyStartWib minimal 07:55" },
+);
+
+/**
+ * Jam selesai: +20 menit (jendela event) tidak boleh lewat 16:30 WIB.
+ */
+export const dayEndWibSchema = hhMmSchema.refine(
+  (s) => hhMmToMinutes(s) + REMINDER_WINDOW_MINUTES <= ACTIVE_END_MINUTES,
+  { message: "dayEndWib + 20 menit maksimal 16:30" },
+);
 
 /** Hari aktif: angka hari ala JS (0=Minggu..6=Sabtu). */
 export const activeDaysSchema = z

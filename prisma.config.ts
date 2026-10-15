@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
+import { resolveCliDatabaseUrl } from "./lib/prisma-guard";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -7,9 +8,10 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
-    // Dev-only: database bayangan untuk `prisma migrate diff`. Di Neon/prod,
-    // diff tidak dijalankan dari aplikasi; hanya dari mesin dev.
-    shadowDatabaseUrl: env("SHADOW_DATABASE_URL"),
+    // CLI (migrate/generate/studio): DIRECT_URL bila diisi, fallback
+    // DATABASE_URL. Diblokir untuk host non-lokal kecuali ALLOW_REMOTE_DB=1.
+    // Runtime TIDAK lewat sini (pakai adapter + DATABASE_URL di lib/db.ts).
+    url: resolveCliDatabaseUrl(),
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
   },
 });
