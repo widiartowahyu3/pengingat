@@ -32,6 +32,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# backup pg_dump lokal (db:backup)
+backups/
+
+# sisa data embedded-postgres lama (dev kini Docker; jangan commit)
+.pgdata/
 
 # vercel
 .vercel

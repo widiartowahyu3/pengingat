@@ -1,0 +1,5 @@
+.next/
+node_modules/
+.pgdata/
+coverage/
+prisma/migrations/

@@ -1,0 +1,164 @@
+// Skema database Study Timer. Provider Postgres untuk dev DAN prod
+// (sengaja tidak berganti-ganti provider).
+// Zona waktu: semua DateTime disimpan UTC; konversi ke Asia/Jakarta hanya di
+// lapisan tampilan/perhitungan batas hari (lib/time.ts, Fase 3).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Track {
+  DICODING
+  CLINFORM
+}
+
+model User {
+  id            String         @id @default(cuid())
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  sessions      StudySession[]
+  targets       DailyTarget[]
+  setting       UserSetting?
+  webSessions   WebSession[]
+  activeSession ActiveSession?
+  reminderEvents ReminderEvent[]
+}
+
+// Sesi aktif dari /mulai (bot). Satu user hanya boleh punya satu sesi aktif
+// (userId sebagai @id). Disimpan di DB, bukan memori, agar tahan restart.
+model ActiveSession {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track           Track
+  startedAt       DateTime
+  plannedFocusMin Int
+  createdAt       DateTime @default(now())
+}
+
+model StudySession {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track           Track
+  startedAt       DateTime
+  endedAt         DateTime
+  // durationMin dihitung server dari endedAt-startedAt (timer web/bot mengirim
+  // timestamp, bukan hasil penjumlahan interval di client).
+  durationMin     Int
+  note            String?  @db.VarChar(280)
+  plannedFocusMin Int
+  createdAt       DateTime @default(now())
+
+  @@index([userId, startedAt])
+  @@index([userId, track, startedAt])
+}
+
+model DailyTarget {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track         Track
+  minutesPerDay Int
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, track])
+}
+
+model UserSetting {
+  userId         String  @id
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultFocusMin Int    @default(25)
+  defaultBreakMin Int    @default(5)
+  // Jadwal harian (WIB, format HH:mm). Semua dapat diatur lewat setting.
+  studyStartWib String  @default("08:00") @db.VarChar(5)
+  dayEndWib     String  @default("16:00") @db.VarChar(5)
+  prayerBreakMin Int    @default(30)
+  // Istirahat Dzuhur khusus Jumat (WIB). Hanya untuk DZUHUR_BREAK/RESUME Jumat.
+  fridayPrayerBreakMin Int @default(60)
+  // Hari aktif: angka hari JS (0=Minggu..6=Sabtu). Di hari non-aktif
+  // tidak ada event yang dikirim.
+  activeDays Int[] @default([0, 1, 2, 3, 4, 5, 6])
+  reminderTimeWib String  @default("07:00") @db.VarChar(5)
+  // Lokasi waktu sholat: preset (locationKey) ATAU kiriman user
+  // (locationLat/locationLon, locationKey null). Tanpa riwayat.
+  locationKey String? @db.VarChar(32)
+  locationLat Float?
+  locationLon Float?
+  updatedAt      DateTime @updatedAt
+}
+
+enum ReminderStatus {
+  CLAIMED
+  SENT
+  FAILED
+}
+
+// Klaim pengiriman pesan (idempotensi antar tick/proses). Aturan:
+// - baris baru -> CLAIMED; pengirim pertama yang INSERT menang.
+// - FAILED, atau CLAIMED lebih lama dari 2 menit (proses mati), boleh
+//   diklaim ulang via UPDATE bersyarat atomik selama masih di jendela.
+// - SENT tidak pernah diklaim ulang.
+model ReminderEvent {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Tanggal kalender WIB (YYYY-MM-DD), bukan UTC.
+  localDate String         @db.VarChar(10)
+  eventKey  String         @db.VarChar(32)
+  status    ReminderStatus @default(CLAIMED)
+  claimedAt DateTime       @default(now())
+  attempts  Int            @default(0)
+  createdAt DateTime       @default(now())
+
+  @@unique([userId, localDate, eventKey])
+  @@index([status, createdAt])
+}
+
+// Penanda kerja maintenance (mis. cleanup >7 hari) agar jalan
+// maksimal sekali per hari dengan batas baris per eksekusi.
+model MaintenanceState {
+  key       String   @id @db.VarChar(32)
+  lastRunAt DateTime
+}
+
+model WebSession {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Yang disimpan adalah HASH token (HMAC-SHA256 dengan SESSION_SECRET),
+  // bukan token mentah. Token mentah hanya ada di cookie httpOnly.
+  tokenHash           String   @unique
+  createdAt           DateTime @default(now())
+  // Sliding expiry 7 hari: diperpanjang tiap aktivitas. absoluteExpiresAt
+  // 30 hari: tidak bisa diperpanjang, wajib login ulang.
+  expiresAt           DateTime
+  absoluteExpiresAt   DateTime
+  ipHash              String?
+  userAgentHash       String?
+
+  @@index([userId, expiresAt])
+}
+
+// Dedup update Telegram: update_id yang sudah diproses diabaikan (balas 200).
+// Baris lama dihapus berkala oleh cron agar tabel tidak tumbuh tanpa batas.
+model TelegramProcessedUpdate {
+  updateId   BigInt   @id
+  receivedAt DateTime @default(now())
+
+  @@index([receivedAt])
+}
+
+// Rate limit + lockout login. Disimpan HASH IP (bukan IP mentah).
+// IP diambil hanya dari header proxy tepercaya bila TRUST_PROXY=true.
+model LoginAttempt {
+  id          String   @id @default(cuid())
+  ipHash      String
+  attemptedAt DateTime @default(now())
+  success     Boolean
+
+  @@index([ipHash, attemptedAt])
+}
