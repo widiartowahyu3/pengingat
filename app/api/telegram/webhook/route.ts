@@ -8,14 +8,22 @@ import { env } from "@/lib/env";
 
 const updateSchema = z.object({ update_id: z.number().int() }).passthrough();
 
-// Singleton per proses server (registerCommands sekali saja).
-let sharedBot: ReturnType<typeof createBot> | null = null;
-function getBot(): ReturnType<typeof createBot> {
-  if (sharedBot === null) {
-    sharedBot = createBot(env.TELEGRAM_BOT_TOKEN);
-    registerCommands(sharedBot);
+// Singleton per proses server: buat bot, daftarkan perintah, dan init sekali.
+let botPromise: Promise<ReturnType<typeof createBot>> | null = null;
+function getBot(): Promise<ReturnType<typeof createBot>> {
+  if (botPromise === null) {
+    botPromise = (async () => {
+      const bot = createBot(env.TELEGRAM_BOT_TOKEN);
+      registerCommands(bot);
+      await bot.init();
+      return bot;
+    })();
+    // Kalau init gagal (misalnya jaringan), coba lagi pada request berikutnya.
+    botPromise.catch(() => {
+      botPromise = null;
+    });
   }
-  return sharedBot;
+  return botPromise;
 }
 
 function isUniqueConflict(err: unknown): boolean {
@@ -65,13 +73,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // Body sudah tervalidasi update_id; teruskan apa adanya ke grammy.
-    await getBot().handleUpdate(
-      body as Parameters<ReturnType<typeof createBot>["handleUpdate"]>[0],
-    );
-  } catch {
-    // Pesan statis: detail update tidak boleh masuk log.
-    console.error("webhook handler error");
+    const bot = await getBot();
+    await bot.handleUpdate(body as Parameters<ReturnType<typeof createBot>["handleUpdate"]>[0]);
+  } catch (err: unknown) {
+    // Hanya nama dan pesan error, tanpa objek update, token, atau secret.
+    const info = err instanceof Error ? `${err.name}: ${err.message}` : "unknown";
+    console.error("webhook handler error", info.slice(0, 200));
   }
   return NextResponse.json({ ok: true });
 }
